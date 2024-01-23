@@ -1,3 +1,4 @@
+library(tabulizer) # requires JDK version of Java, and rJava package
 library(fUnitRoots) # for timeseries stationarity tests
 
 # TODO
@@ -9,7 +10,25 @@ library(fUnitRoots) # for timeseries stationarity tests
 
 ## Enviro vars -------------------------------------------------------------
 
-## PP, SST, TOC, 13C, 15N
+# PP, SST, TOC, 13C, 15N
+
+# TOC - Berger 2004
+
+nmBerg04 <- 'data-raw/Berger-et-al-2004_Baumgartner-1992.pdf'
+Berg04raw <- extract_tables(nmBerg04, pages = 21:40) |>
+  lapply( function(l) apply(l, c(1,2), as.numeric) )
+# all entries treated as character; must convert type before rbind on rows
+
+Berg04 <- do.call(rbind, Berg04raw)
+colnames(Berg04) <- c('year', 'TOC', 'TOCdetrend')
+
+# TOC - Wang et al. 2017
+
+# ENSO - Li et al. 2011
+
+# floods/droughts - Sarno 2020
+
+# biogenic opal - Barron 2013
 
 ## Primary producers -------------------------------------------------------
 
@@ -23,6 +42,12 @@ library(fUnitRoots) # for timeseries stationarity tests
 
 # anchovy, sardine, mesopelagic fish
 # hake - piscivores
+
+# Baumgartner 1992 data included in Berger et al 2004 supplement
+Baum92raw <- extract_tables(nmBerg04, pages = 1:5) |> 
+  lapply( function(l) apply(l, c(1,2), as.numeric) )
+Baum92 <- do.call(rbind, Baum92raw)
+colnames(Baum92) <- c('year', 'sardine', 'anchovy')
 
 # Stationarity tests ------------------------------------------------------
 
