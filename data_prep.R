@@ -49,6 +49,23 @@ Baum92raw <- extract_tables(nmBerg04, pages = 1:5) |>
 Baum92 <- do.call(rbind, Baum92raw)
 colnames(Baum92) <- c('year', 'sardine', 'anchovy')
 
+# Jones and Checkley 2019
+# otolith deposition rate for 5 families, and SST and PP proxies from JP Kennett
+
+nmJC19 <- 'data-raw/Jones-Checkley-2019-decadal.csv'
+JC19 <- read.csv(nmJC19)
+colnames(JC19)[1] <- 'year' # rename from 'year_ad' to match other datasets
+
+# last 4 columns are empty; identify columns with data
+findDataCols <- function(v){
+  any( !is.na(v) )
+} 
+keepCols <- apply(JC19, 2,  findDataCols)
+JC19 <- JC19[, keepCols]
+
+# missing values currently set as NaN
+JC19 <- apply(JC19, 2, function(x) replace(x, is.nan(x), NA))
+
 # Stationarity tests ------------------------------------------------------
 
 # example code copied from EcoRelease repo
