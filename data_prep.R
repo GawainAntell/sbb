@@ -1,17 +1,16 @@
 library(stringr)
 library(tabulizer) # read PDF tables; requires JDK vsn of Java, and rJava pkg
+library(tidyr)
+library(ggplot2)
 library(fUnitRoots) # for timeseries stationarity tests
-
-# TODO
-# standardize data format
-# test timeseries stationarity
-# ordinate and inspect PCA
 
 # Vet and format data -----------------------------------------------------
 
 ## Enviro vars -------------------------------------------------------------
 
-# PP, SST, TOC, 13C, 15N
+# PP, SST - JP Kennett's data included with Jones and Checkley otoliths (below)
+
+# 13C, 15N
 
 # TOC - Berger 2004
 
@@ -20,7 +19,8 @@ Berg04raw <- extract_tables(nmBerg04, pages = 21:40) |>
   lapply( function(l) apply(l, c(1,2), as.numeric) )
 # all entries treated as character; must convert type before rbind on rows
 
-Berg04 <- do.call(rbind, Berg04raw)
+Berg04 <- do.call(rbind, Berg04raw) |>
+  data.frame()
 colnames(Berg04) <- c('year', 'TOC', 'TOCdetrend')
 
 # TOC - Wang et al. 2017
@@ -94,20 +94,42 @@ colnames(Baum92) <- c('year', 'sardine', 'anchovy')
 # mesopelagic fish - Jones and Checkley 2019
 # otolith deposition rate for 5 families, and SST and PP proxies from JP Kennett
 
-nmJC19 <- 'data-raw/Jones-Checkley-2019-decadal.csv'
-JC19 <- read.csv(nmJC19) 
-colnames(JC19)[1] <- 'year' # rename from 'year_ad' to match other datasets
+jc19 <- read.csv('data-raw/Jones-Checkley-2019-decadal.csv') 
+colnames(jc19)[1] <- 'year' # rename from 'year_ad' to match other datasets
 
 # last 4 columns are empty; identify columns with data
-keepCols <- apply(JC19, 2,  findBlanks)
-JC19 <- JC19[, keepCols]
+keepCols <- apply(jc19, 2,  findBlanks)
+jc19 <- jc19[, keepCols]
 
 # missing values currently set as NaN
-JC19 <- apply(JC19, 2, function(x) replace(x, is.nan(x), NA)) |>
+jc19 <- apply(jc19, 2, function(x) replace(x, is.nan(x), NA)) |>
   data.frame()
 
-# TODO hake - piscivores
-# check Jones and Checkley paper for data source?
+# Data distribution plot --------------------------------------------------
+
+timescale <- 0:2010 # 1748:2010
+plotDat <- data.frame('year' = timescale)
+datNms <- c('toc', 'diatoms', 'silicos', 'scales', 'otoliths')
+for (dat in list(Berg04, Barr13d, Barr13s, Baum92, jc19)){
+  hasDat <- plotDat[ ,'year'] %in% dat[ ,'year'] |>
+    as.numeric()
+  plotDat <- cbind(plotDat, hasDat)
+}
+colnames(plotDat)[-1] <- datNms
+plotDatLng <- pivot_longer(plotDat, cols = all_of(datNms), 
+                           names_to = 'dataset',
+                           values_to = 'sampled')
+plotDatLng$dataset <- factor(plotDatLng$dataset, 
+       levels = c('toc', 'silicos', 'diatoms', 'scales', 'otoliths'),
+       ordered = TRUE)
+ggplot(plotDatLng[ plotDatLng$sampled==1, ], 
+       aes(x = year, y = dataset)) +
+  theme_bw() +
+  scale_x_continuous(name = 'year AD', 
+                     limits = range(timescale),
+                     expand = expansion(add = c(0, 20)),
+                     breaks = seq(0, 2000, by = 250)) +
+  geom_point(size = 0.3)
 
 # Stationarity tests ------------------------------------------------------
 
