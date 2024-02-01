@@ -10,8 +10,6 @@ library(fUnitRoots) # for timeseries stationarity tests
 
 # PP, SST - JP Kennett's data included with Jones and Checkley otoliths (below)
 
-# 13C, 15N
-
 # TOC - Berger 2004
 
 nmBerg04 <- 'data-raw/Berger-et-al-2004_Baumgartner-1992.pdf'
@@ -23,13 +21,44 @@ Berg04 <- do.call(rbind, Berg04raw) |>
   data.frame()
 colnames(Berg04) <- c('year', 'TOC', 'TOCdetrend')
 
-# TOC - Wang et al. 2017
-
 # ENSO - Li et al. 2011
+
+Li11 <- read.table('data-raw/Li-et-al-2011.txt', 
+                   header = TRUE, comment.char = '#')
+colnames(Li11)[1] <- 'year'
+
+# biogenic opal - Barron 2013
+
+Barr13o_splt <- read.csv('data-raw/Barron-et-al-2013-opal.csv')
+# entire dataset is split at 1884, and second half pasted as columns to right :|
+dupeColsO <- str_ends(colnames(Barr13o_splt), '1')
+topHlfO <- Barr13o_splt[, !dupeColsO]
+topHlfO<- topHlfO[ , -ncol(topHlfO)] # blank divider column
+lwrHlfO <- Barr13o_splt[, dupeColsO]
+colnames(lwrHlfO) <- str_sub(colnames(lwrHlfO), end = -3) # strip '.1' suffix
+Barr13o <- rbind(topHlfO, lwrHlfO)
+# spaces converted to periods from excel, and periods appear in gen abbreviations
+colnames(Barr13o) <- gsub(x = colnames(Barr13o), pattern = '\\.\\.', replacement = '_')  
+colnames(Barr13o) <- gsub(x = colnames(Barr13o), pattern = '\\.', replacement = '_') 
+# omit trailing space in names where present
+trails <- str_ends(colnames(Barr13o), '_')
+colnames(Barr13o)[trails] <- colnames(Barr13o)[trails] |>
+  str_sub(end = -2)
+omitCols <- c('Varve_range', 'Bottom_varve')
+Barr13o <- Barr13o[ , !colnames(Barr13o) %in% omitCols]
+# remove rows at bottom of original spreadsheet - no values
+findBlanks <- function(v){
+  any( !is.na(v) )
+} 
+keepRowsO <- apply(Barr13o, 1,  findBlanks) # do this after removing metadata cols
+Barr13o <- Barr13o[keepRowsO, ]
+colnames(Barr13o)[1] <- 'year' # this is the oldest (bottom) year of the sample
+
+# TOC - Wang et al. 2017
 
 # floods/droughts - Sarno 2020
 
-# biogenic opal - Barron 2013
+# 13C, 15N
 
 ## Primary producers -------------------------------------------------------
 
@@ -39,32 +68,29 @@ Barr13d <- read.csv('data-raw/Barron-et-al-2013-diatoms.csv')
 # spaces converted to periods from excel, and periods appear in gen abbreviations
 colnames(Barr13d) <- gsub(x = colnames(Barr13d), pattern = '\\.\\.', replacement = '_')  
 colnames(Barr13d) <- gsub(x = colnames(Barr13d), pattern = '\\.', replacement = '_')  
-# omit trailing space where present
-trails <- str_ends(colnames(Barr13d), '_')
-colnames(Barr13d)[trails] <- colnames(Barr13d)[trails] |>
+# omit trailing space in names where present
+trailsD <- str_ends(colnames(Barr13d), '_')
+colnames(Barr13d)[trailsD] <- colnames(Barr13d)[trailsD] |>
   str_sub(end = -2)
 # some columns contain metadata, not species abundances (or not relevant taxa)
-omitCols <- c('Varve_range', 'Bottom_varve',
+omitCols <- c(omitCols, # varve range, bottom varve number
               'Benthic', 'Freshwater_planktic', 'Reworked', 'Total_counted')
 Barr13d <- Barr13d[ , !colnames(Barr13d) %in% omitCols]
 # final rows are completely empty
-findBlanks <- function(v){
-  any( !is.na(v) )
-} 
 keepRowsD <- apply(Barr13d, 1,  findBlanks)
 Barr13d <- Barr13d[keepRowsD, ]
 colnames(Barr13d)[1] <- 'year' # this is the oldest (bottom) year of the sample
 
 # silicoflagellates - Barron et al. 2013
 
-Barr13raw <- read.csv('data-raw/Barron-et-al-2013-silicoflagellates.csv')
+Barr13s_splt <- read.csv('data-raw/Barron-et-al-2013-silicoflagellates.csv')
 # entire dataset is split at 1884, and second half pasted as columns to right :|
-dupeCols <- str_ends(colnames(Barr13raw), '1')
-topHlf <- Barr13raw[, !dupeCols]
-topHlf<- topHlf[ , -ncol(topHlf)] # blank divider column
-lwrHlf <- Barr13raw[, dupeCols]
-colnames(lwrHlf) <- str_sub(colnames(lwrHlf), end = -3) # strip '.1' suffix
-Barr13s <- rbind(topHlf, lwrHlf)
+dupeColsS <- str_ends(colnames(Barr13s_splt), '1')
+topHlfS <- Barr13s_splt[, !dupeColsS]
+topHlfS <- topHlfS[ , -ncol(topHlfS)] # blank divider column
+lwrHlfS <- Barr13s_splt[, dupeColsS]
+colnames(lwrHlfS) <- str_sub(colnames(lwrHlfS), end = -3) # strip '.1' suffix
+Barr13s <- rbind(topHlfS, lwrHlfS)
 # repeat cleaning steps for Barron et al. 2013 diatom data (above)
 colnames(Barr13s) <- gsub(x = colnames(Barr13s), pattern = '\\.\\.', replacement = '_')
 colnames(Barr13s) <- gsub(x = colnames(Barr13s), pattern = '\\.', replacement = '_')
@@ -109,8 +135,8 @@ jc19 <- apply(jc19, 2, function(x) replace(x, is.nan(x), NA)) |>
 
 timescale <- 0:2010 # 1748:2010
 plotDat <- data.frame('year' = timescale)
-datNms <- c('toc', 'diatoms', 'silicos', 'scales', 'otoliths')
-for (dat in list(Berg04, Barr13d, Barr13s, Baum92, jc19)){
+datNms <- c('enso', 'toc', 'opal', 'diatoms', 'silicos', 'scales', 'otoliths')
+for (dat in list(Li11, Berg04, Barr13o, Barr13d, Barr13s, Baum92, jc19)){
   hasDat <- plotDat[ ,'year'] %in% dat[ ,'year'] |>
     as.numeric()
   plotDat <- cbind(plotDat, hasDat)
@@ -120,7 +146,7 @@ plotDatLng <- pivot_longer(plotDat, cols = all_of(datNms),
                            names_to = 'dataset',
                            values_to = 'sampled')
 plotDatLng$dataset <- factor(plotDatLng$dataset, 
-       levels = c('toc', 'silicos', 'diatoms', 'scales', 'otoliths'),
+       levels = datNms,
        ordered = TRUE)
 ggplot(plotDatLng[ plotDatLng$sampled==1, ], 
        aes(x = year, y = dataset)) +
