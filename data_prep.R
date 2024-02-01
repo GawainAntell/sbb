@@ -20,12 +20,14 @@ Berg04raw <- extract_tables(nmBerg04, pages = 21:40) |>
 Berg04 <- do.call(rbind, Berg04raw) |>
   data.frame()
 colnames(Berg04) <- c('year', 'TOC', 'TOCdetrend')
+# write.csv(Berg04, 'data/Berger-et-al-2004_cleaned.csv', row.names = FALSE)
 
 # ENSO - Li et al. 2011
 
 Li11 <- read.table('data-raw/Li-et-al-2011.txt', 
                    header = TRUE, comment.char = '#')
 colnames(Li11)[1] <- 'year'
+# write.csv(Li11, 'data/Li-et-al-2011_cleaned.csv', row.names = FALSE)
 
 # biogenic opal - Barron 2013
 
@@ -53,6 +55,7 @@ findBlanks <- function(v){
 keepRowsO <- apply(Barr13o, 1,  findBlanks) # do this after removing metadata cols
 Barr13o <- Barr13o[keepRowsO, ]
 colnames(Barr13o)[1] <- 'year' # this is the oldest (bottom) year of the sample
+# write.csv(Barr13o, 'data/Barron-et-al-2013-opal_cleaned.csv', row.names = FALSE)
 
 # TOC - Wang et al. 2017
 
@@ -80,6 +83,7 @@ Barr13d <- Barr13d[ , !colnames(Barr13d) %in% omitCols]
 keepRowsD <- apply(Barr13d, 1,  findBlanks)
 Barr13d <- Barr13d[keepRowsD, ]
 colnames(Barr13d)[1] <- 'year' # this is the oldest (bottom) year of the sample
+# write.csv(Barr13d, 'data/Barron-et-al-2013-diatoms_cleaned.csv', row.names = FALSE)
 
 # silicoflagellates - Barron et al. 2013
 
@@ -101,6 +105,7 @@ Barr13s <- Barr13s[ , !colnames(Barr13s) %in% omitCols]
 keepRowsS <- apply(Barr13s, 1,  findBlanks) # do this after removing metadata cols
 Barr13s <- Barr13s[keepRowsS, ]
 colnames(Barr13s)[1] <- 'year' # this is the oldest (bottom) year of the sample
+# write.csv(Barr13s, 'data/Barron-et-al-2013-silicoflagellates_cleaned.csv', row.names = FALSE)
 
 # consider converting count data type from integer to numeric
 
@@ -116,6 +121,7 @@ Baum92raw <- extract_tables(nmBerg04, pages = 1:5) |>
   lapply( function(l) apply(l, c(1,2), as.numeric) )
 Baum92 <- do.call(rbind, Baum92raw)
 colnames(Baum92) <- c('year', 'sardine', 'anchovy')
+# write.csv(Baum92, 'data/Baumgartner-1992_cleaned.csv', row.names = FALSE)
 
 # mesopelagic fish - Jones and Checkley 2019
 # otolith deposition rate for 5 families, and SST and PP proxies from JP Kennett
@@ -130,6 +136,7 @@ jc19 <- jc19[, keepCols]
 # missing values currently set as NaN
 jc19 <- apply(jc19, 2, function(x) replace(x, is.nan(x), NA)) |>
   data.frame()
+# write.csv(jc19, 'data/Jones-Checkley-2019_cleaned.csv', row.names = FALSE)
 
 # Data distribution plot --------------------------------------------------
 
