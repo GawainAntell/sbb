@@ -105,11 +105,22 @@ comp <- cbind(comp, sili2add)
 
 # Stationarity tests ------------------------------------------------------
 
-# example code copied from EcoRelease repo
-# adfTest(globlRich) 
-# acf(globlRich) 
-# rich_AR <- arima(globlRich, order = c(1, 0, 0)) # fit AR1 model
-# rich_e <- as.numeric(rich_AR$residuals)
-# acf(rich_e)
-# adfTest(rich_e) 
-# rich_AR$coef
+for (col in 2:ncol(comp)){
+  v <- comp[, col]
+  v <- na.omit(v)
+  tst <- adfTest(v) # testing null that there is NON-stationarity
+  p <- round(tst@test$p.value, 2)
+  paste(colnames(comp)[col], 'adf test p =', p) |> print()
+  # inspect autocorr at all lags and magnitude of 1st-order autocorr
+    # acf(v) 
+    # vAR <- arima(v, order = c(1, 0 , 0))
+    # vAR$residuals |> as.numeric() |> acf()
+    # vAR$coef
+}
+# [1] "ensoi adf test p = 0.01"
+# [1] "ensovar adf test p = 0.5"
+# [1] "TOC adf test p = 0.36"
+# [1] "opal adf test p = 0.18"
+# [1] "dia1 adf test p = 0.01"
+# [1] "dia2 adf test p = 0.01"
+# [1] "sili1 adf test p = 0.01"

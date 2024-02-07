@@ -163,14 +163,3 @@ ggplot(plotDatLng[ plotDatLng$sampled==1, ],
                      expand = expansion(add = c(0, 20)),
                      breaks = seq(0, 2000, by = 250)) +
   geom_point(size = 0.3)
-
-# Stationarity tests ------------------------------------------------------
-
-# example code copied from EcoRelease repo
-  # adfTest(globlRich) 
-  # acf(globlRich) 
-  # rich_AR <- arima(globlRich, order = c(1, 0, 0)) # fit AR1 model
-  # rich_e <- as.numeric(rich_AR$residuals)
-  # acf(rich_e)
-  # adfTest(rich_e) 
-  # rich_AR$coef
