@@ -1,6 +1,5 @@
 library(factoextra)
 list.files('data/')
-comp <- data.frame('year' = 2010:1748)
 
 # Questions about data ----------------------------------------------------
 
@@ -14,32 +13,33 @@ comp <- data.frame('year' = 2010:1748)
 
 # 250y composite df -------------------------------------------------------
 
-# TODO
-# write function that matches rows in data to rows of target composite df
-# exclude any missing matches and round non-integer years
-# return column(s) of target variables with NAs for non-measured study years
+comp <- data.frame('year' = 2010:1748)
 
-# ENSO
-enso <- read.csv('data/Li-et-al-2011_cleaned.csv')
-# what row in comp does each Li row's year correspond to?
-whenEnso <- match(enso$year, comp$year)
-tooDeep <- is.na(whenEnso) # data series extends older than study interval start
-newCols <- tail(colnames(enso), -1)
-comp[ , newCols] <- NA
-comp[na.omit(whenEnso), newCols] <- enso[ !tooDeep, newCols]
-
-# TOC
-toc <- read.csv('data/Berger-et-al-2004_cleaned.csv')
-# what row in comp does each Berger row's year correspond to?
-whenToc <- match(toc$year, comp$year)
-tooDeep <- is.na(whenToc) # data series extends older than study interval start
-comp$toc <- NA
-comp$toc[ na.omit(whenToc) ] <- toc$TOC[ !tooDeep ]
+# Helper function - match rows in data to rows of target composite df:
+# - exclude any missing matches and round non-integer years
+# - return column(s) of target variables with NAs for non-measured study years
+# tmplt = vector/column of years from target composite dataframe
+# yrCol = name or position of column in dat AND tmplt with age/year data
+# xtrctCol = name(s) of column(s) in dat to add to composite df
+matchTime <- function(dat, tmplt = comp, yrCol = 'year', xtrctCol){
+  whenDat <- match(dat[, yrCol], tmplt[, yrCol])
+  outsideTmplt <- is.na(whenDat) # if data extends beyond target study interval
+  newCols <- rep(NA, nrow(tmplt)) |> data.frame()
+  reps <- length(xtrctCol) - 1
+  if (reps > 0){
+    for (i in 1:reps){
+      newCols <- cbind(newCols, newCols)
+    }
+  }
+  newCols[ na.omit(whenDat), ] <- dat[ !outsideTmplt, xtrctCol]
+  colnames(newCols) <- xtrctCol
+  newCols
+}
 
 # PCA helper function:
-# return positions of columns that PCA will be performed on -
-# remove age data and any variables with zero variance
-# optionally supply the name of other variables to exclude
+# - return positions of columns that PCA will be performed on -
+# - remove age data and any variables with zero variance
+# - optionally supply the name of other variables to exclude
 okCols <- function(dat, otherExclude = NULL){
   yrCol <- which(colnames(dat) == 'year')
   constCol <- which( apply(dat, 2, sd) == 0 ) # static value; can't use in PCA
@@ -52,28 +52,56 @@ okCols <- function(dat, otherExclude = NULL){
   out 
 }
 
+# ENSO
+enso <- read.csv('data/Li-et-al-2011_cleaned.csv')
+enso2add <- matchTime(dat = enso, xtrctCol = c('ensoi', 'ensovar'))
+comp <- cbind(comp, enso2add)
+
+# TOC
+toc <- read.csv('data/Berger-et-al-2004_cleaned.csv')
+toc2add <- matchTime(dat = toc, xtrctCol = 'TOC') # c('TOC', 'TOCdetrend')
+comp <- cbind(comp, toc2add)
+
+# biogenic silica
+opal <- read.csv('data/Barron-et-al-2013-opal_cleaned.csv')
+opal2add <- matchTime(dat = opal, xtrctCol = 'Biogenic_silica')
+colnames(opal2add) <- 'opal'
+comp <- cbind(comp, opal2add)
+
 # diatom abundances
-# NB: there is one non-integer year (Barr13d$year[95], 1833.5) rounded off
+# NB: there is one non-integer year (Barr13d$year[95] = 1833.5) rounded off
 Barr13d <- read.csv('data/Barron-et-al-2013-diatoms_cleaned.csv')
 diaCols <- okCols(Barr13d, 'Other_planktic')
-pcDia <- prcomp(Barr13d[, diaCols], scale = FALSE)
-summary(pcDia)
+pcDia <- prcomp(Barr13d[, diaCols], scale = FALSE) 
 # print(pcDia) # show loadings of individual species on each axis
+smryDia <- summary(pcDia)
+smryDia$importance['Cumulative Proportion', 1:4]
+# keep first 2 axes (explain > 66% variation)
+#     PC1     PC2     PC3     PC4 
+# 0.37505 0.66217 0.79005 0.84585 
 yrDia <- get_pca_ind(pcDia)
-# what row in comp does each Barr13d row's year correspond to?
-whenDia <- match(round(Barr13d$year), comp$year)
-comp$dia2 <- comp$dia1 <- NA
-comp$dia1[ whenDia ] <- yrDia$coord[, 1]
-comp$dia2[ whenDia ] <- yrDia$coord[, 2]
+yrDiaCoords <- yrDia$coord
+yrDiaCoords <- cbind(yrDiaCoords, 'year' = round(Barr13d$year))
+dia2add <- matchTime(dat = yrDiaCoords, xtrctCol = c('Dim.1', 'Dim.2'))
+colnames(dia2add) <- c('dia1', 'dia2')
+comp <- cbind(comp, dia2add)
 
 # silicoflagellate abundances
+# NB: there is one non-integer year (Barr13s$year[95] = 1833.5) rounded off
 Barr13s <- read.csv('data/Barron-et-al-2013-silicoflagellates_cleaned.csv')
 siliCols <- okCols(Barr13s)
 pcSili <- prcomp(Barr13s[, siliCols], scale = FALSE)
-summary(pcSili)
+smrySili <- summary(pcSili)
+smrySili$importance['Cumulative Proportion', 1:4]
+# keep first axis (explains ~60% variation)
+#     PC1     PC2     PC3     PC4 
+# 0.59709 0.84951 0.89828 0.94291
 yrSili <- get_pca_ind(pcSili)
-whenSili <- match(round(Barr13s$year), comp$year)
-comp$sili1[ whenDia ] <- yrSili$coord[, 1]
+yrSiliCoords <- yrSili$coord
+yrSiliCoords <- cbind(yrSiliCoords, 'year' = round(Barr13s$year))
+sili2add <- matchTime(dat = yrSiliCoords, xtrctCol = 'Dim.1')
+colnames(sili2add) <- 'sili1'
+comp <- cbind(comp, sili2add)
 
 # Stationarity tests ------------------------------------------------------
 
