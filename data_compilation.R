@@ -103,14 +103,33 @@ sili2add <- matchTime(dat = yrSiliCoords, xtrctCol = 'Dim.1')
 colnames(sili2add) <- 'sili1'
 comp <- cbind(comp, sili2add)
 
+# Time binning ------------------------------------------------------------
+
+# ensoi, ensovar, TOC, opal, diatoms, and silicoflagellate data -
+# finest binning attainable for all data sources is 2yr, from 1987 down
+bins <- seq(from = 1986, to = 1748, by = -2) # defined by BOTTOM year
+binnd <- data.frame()
+for (b in bins){
+  bRows <- which(comp$year %in% c(b, b+1))
+  naTally <- apply(comp[bRows, ], 1, function(x){
+    is.na(x) |> sum()
+  })
+  bestRow <- which.min(naTally) |> names() |> as.numeric()
+  copy <- cbind('yearBin' = b, comp[bestRow, ])
+  binnd <- rbind(binnd, copy)
+}
+if (is.na(binnd) |> sum() > 0){ stop('check the data for holes') }
+
+# TODO - option for including additional data sources at different grains:
+# interpolate each series, then bin at desired resolution
+
 # Stationarity tests ------------------------------------------------------
 
-for (col in 2:ncol(comp)){
-  v <- comp[, col]
-  v <- na.omit(v)
+for (col in 3:ncol(binnd)){
+  v <- binnd[, col]
   tst <- adfTest(v) # testing null that there is NON-stationarity
   p <- round(tst@test$p.value, 2)
-  paste(colnames(comp)[col], 'adf test p =', p) |> print()
+  paste(colnames(binnd)[col], 'adf test p =', p) |> print()
   # inspect autocorr at all lags and magnitude of 1st-order autocorr
     # acf(v) 
     # vAR <- arima(v, order = c(1, 0 , 0))
@@ -118,9 +137,9 @@ for (col in 2:ncol(comp)){
     # vAR$coef
 }
 # [1] "ensoi adf test p = 0.01"
-# [1] "ensovar adf test p = 0.5"
-# [1] "TOC adf test p = 0.36"
-# [1] "opal adf test p = 0.18"
+# [1] "ensovar adf test p = 0.46"
+# [1] "TOC adf test p = 0.58"
+# [1] "opal adf test p = 0.34"
 # [1] "dia1 adf test p = 0.01"
 # [1] "dia2 adf test p = 0.01"
 # [1] "sili1 adf test p = 0.01"
