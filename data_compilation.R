@@ -1,5 +1,6 @@
 library(factoextra) # for PCA extraction
 library(fUnitRoots) # for timeseries stationarity tests
+source('utils.R') # for custom matchTime() function
 # csv names of raw data files to concatenate:
 allFl <- list.files('data/')
 allFl[ grep('cleaned', allFl) ]
@@ -17,27 +18,6 @@ allFl[ grep('cleaned', allFl) ]
 # 250y composite df -------------------------------------------------------
 
 comp <- data.frame('year' = 2010:1748)
-
-# Helper function - match rows in data to rows of target composite df:
-# - exclude any missing matches and round non-integer years
-# - return column(s) of target variables with NAs for non-measured study years
-# tmplt = vector/column of years from target composite dataframe
-# yrCol = name or position of column in dat AND tmplt with age/year data
-# xtrctCol = name(s) of column(s) in dat to add to composite df
-matchTime <- function(dat, tmplt = comp, yrCol = 'year', xtrctCol){
-  whenDat <- match(dat[, yrCol], tmplt[, yrCol])
-  outsideTmplt <- is.na(whenDat) # if data extends beyond target study interval
-  newCols <- rep(NA, nrow(tmplt)) |> data.frame()
-  reps <- length(xtrctCol) - 1
-  if (reps > 0){
-    for (i in 1:reps){
-      newCols <- cbind(newCols, newCols)
-    }
-  }
-  newCols[ na.omit(whenDat), ] <- dat[ !outsideTmplt, xtrctCol]
-  colnames(newCols) <- xtrctCol
-  newCols
-}
 
 # PCA helper function:
 # - return positions of columns that PCA will be performed on -
@@ -57,17 +37,20 @@ okCols <- function(dat, otherExclude = NULL){
 
 # ENSO
 enso <- read.csv('data/Li-et-al-2011_cleaned.csv')
-enso2add <- matchTime(dat = enso, xtrctCol = c('ensoi', 'ensovar'))
+# matchTime function defined in utils.R
+enso2add <- matchTime(dat = enso, tmplt = comp, 
+                      xtrctCol = c('ensoi', 'ensovar'))
 comp <- cbind(comp, enso2add)
 
 # TOC
 toc <- read.csv('data/Berger-et-al-2004_cleaned.csv')
-toc2add <- matchTime(dat = toc, xtrctCol = 'TOC') # c('TOC', 'TOCdetrend')
+toc2add <- matchTime(dat = toc, tmplt = comp, 
+                     xtrctCol = 'TOC') # c('TOC', 'TOCdetrend')
 comp <- cbind(comp, toc2add)
 
 # biogenic silica
 opal <- read.csv('data/Barron-et-al-2013-opal_cleaned.csv')
-opal2add <- matchTime(dat = opal, xtrctCol = 'Biogenic_silica')
+opal2add <- matchTime(dat = opal, tmplt = comp, xtrctCol = 'Biogenic_silica')
 colnames(opal2add) <- 'opal'
 comp <- cbind(comp, opal2add)
 
@@ -85,7 +68,8 @@ smryDia$importance['Cumulative Proportion', 1:4]
 yrDia <- get_pca_ind(pcDia)
 yrDiaCoords <- yrDia$coord
 yrDiaCoords <- cbind(yrDiaCoords, 'year' = round(Barr13d$year))
-dia2add <- matchTime(dat = yrDiaCoords, xtrctCol = c('Dim.1', 'Dim.2'))
+dia2add <- matchTime(dat = yrDiaCoords, tmplt = comp, 
+                     xtrctCol = c('Dim.1', 'Dim.2'))
 colnames(dia2add) <- c('dia1', 'dia2')
 comp <- cbind(comp, dia2add)
 
@@ -102,7 +86,7 @@ smrySili$importance['Cumulative Proportion', 1:4]
 yrSili <- get_pca_ind(pcSili)
 yrSiliCoords <- yrSili$coord
 yrSiliCoords <- cbind(yrSiliCoords, 'year' = round(Barr13s$year))
-sili2add <- matchTime(dat = yrSiliCoords, xtrctCol = 'Dim.1')
+sili2add <- matchTime(dat = yrSiliCoords, tmplt = comp, xtrctCol = 'Dim.1')
 colnames(sili2add) <- 'sili1'
 comp <- cbind(comp, sili2add)
 
@@ -116,7 +100,8 @@ smryDS$importance['Cumulative Proportion', 1:4]
 yrDS <- get_pca_ind(pcDS)
 yrDScoords <- yrDS$coord
 yrDScoords <- cbind(yrDScoords, 'year' = round(Barr13s$year))
-DS2add <- matchTime(dat = yrDScoords, xtrctCol = c('Dim.1', 'Dim.2'))
+DS2add <- matchTime(dat = yrDScoords, tmplt = comp, 
+                    xtrctCol = c('Dim.1', 'Dim.2'))
 colnames(DS2add) <- c('DS1', 'DS2')
 comp <- cbind(comp, DS2add)
 
@@ -137,7 +122,7 @@ for (b in bins){
 }
 if (is.na(binnd) |> sum() > 0){ stop('check the data for holes') }
 
-# write.csv(binnd, 'data/composite-datasets-binned-250y.csv')
+# write.csv(binnd, 'data/composite-datasets-binned-250y.csv', row.names = FALSE)
 
 # TODO - option for including additional data sources at different grains:
 # interpolate each series, then bin at desired resolution
