@@ -1,5 +1,8 @@
-library(factoextra)
-list.files('data/')
+library(factoextra) # for PCA extraction
+library(fUnitRoots) # for timeseries stationarity tests
+# csv names of raw data files to concatenate:
+allFl <- list.files('data/')
+allFl[ grep('cleaned', allFl) ]
 
 # Questions about data ----------------------------------------------------
 
@@ -103,6 +106,20 @@ sili2add <- matchTime(dat = yrSiliCoords, xtrctCol = 'Dim.1')
 colnames(sili2add) <- 'sili1'
 comp <- cbind(comp, sili2add)
 
+# option: combine diatoms and silicoflagellates, take first 2 axes:
+BarrBoth <- cbind(Barr13d[, diaCols], Barr13s[, siliCols])
+pcDS <- prcomp(BarrBoth, scale = FALSE) 
+smryDS <- summary(pcDS)
+smryDS$importance['Cumulative Proportion', 1:4]
+#     PC1     PC2     PC3     PC4 
+# 0.43557 0.62612 0.72844 0.81071
+yrDS <- get_pca_ind(pcDS)
+yrDScoords <- yrDS$coord
+yrDScoords <- cbind(yrDScoords, 'year' = round(Barr13s$year))
+DS2add <- matchTime(dat = yrDScoords, xtrctCol = c('Dim.1', 'Dim.2'))
+colnames(DS2add) <- c('DS1', 'DS2')
+comp <- cbind(comp, DS2add)
+
 # Time binning ------------------------------------------------------------
 
 # ensoi, ensovar, TOC, opal, diatoms, and silicoflagellate data -
@@ -119,6 +136,8 @@ for (b in bins){
   binnd <- rbind(binnd, copy)
 }
 if (is.na(binnd) |> sum() > 0){ stop('check the data for holes') }
+
+# write.csv(binnd, 'data/composite-datasets-binned-250y.csv')
 
 # TODO - option for including additional data sources at different grains:
 # interpolate each series, then bin at desired resolution
@@ -143,3 +162,5 @@ for (col in 3:ncol(binnd)){
 # [1] "dia1 adf test p = 0.01"
 # [1] "dia2 adf test p = 0.01"
 # [1] "sili1 adf test p = 0.01"
+# [1] "DS1 adf test p = 0.01"
+# [1] "DS2 adf test p = 0.01"
