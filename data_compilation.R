@@ -149,3 +149,16 @@ for (col in 3:ncol(binnd)){
 # [1] "sili1 adf test p = 0.01"
 # [1] "DS1 adf test p = 0.01"
 # [1] "DS2 adf test p = 0.01"
+
+# 2ky composite df --------------------------------------------------------
+
+# combine fish scale and TOC data over the common era
+# TOC data from Berger (above) extends back over much of the longer interval of 
+# Baumgartner, although the fish scales are decadal and only continue to 1970
+
+scl <- read.csv('data/Baumgartner-1992_cleaned.csv')
+toc2add2k <- matchTime(dat = toc, tmplt = scl, 
+                       xtrctCol = 'TOC') # c('TOC', 'TOCdetrend')
+ce <- cbind(scl, toc2add2k)
+ce <- ce[ complete.cases(ce), ]
+write.csv(ce, 'data/composite-datasets-binned-2ky.csv', row.names = FALSE)
