@@ -1,6 +1,7 @@
+library(timeSeries) # library(wql) # linear interpolation within time-series
 library(factoextra) # for PCA extraction
 library(fUnitRoots) # for timeseries stationarity tests
-source('utils.R') # for custom matchTime() function
+source('utils.R') # for custom helper functions
 # csv names of raw data files to concatenate:
 allFl <- list.files('data/')
 allFl[ grep('cleaned', allFl) ]
@@ -18,6 +19,7 @@ allFl[ grep('cleaned', allFl) ]
 # 250y composite df -------------------------------------------------------
 
 comp <- data.frame('year' = 2010:1748)
+# template for composite dataframe over the years of the shorter study span
 
 # PCA helper function:
 # - return positions of columns that PCA will be performed on -
@@ -45,7 +47,7 @@ comp <- cbind(comp, enso2add)
 # TOC
 toc <- read.csv('data/Berger-et-al-2004_cleaned.csv')
 toc2add <- matchTime(dat = toc, tmplt = comp, 
-                     xtrctCol = 'TOC') # c('TOC', 'TOCdetrend')
+                     xtrctCol = c('TOC', 'TOCdetrend') )
 comp <- cbind(comp, toc2add)
 
 # biogenic silica
@@ -105,11 +107,41 @@ DS2add <- matchTime(dat = yrDScoords, tmplt = comp,
 colnames(DS2add) <- c('DS1', 'DS2')
 comp <- cbind(comp, DS2add)
 
-# Time binning ------------------------------------------------------------
+# 2ky composite df --------------------------------------------------------
 
-# ensoi, ensovar, TOC, opal, diatoms, and silicoflagellate data -
-# finest binning attainable for all data sources is 2yr, from 1987 down
-bins <- seq(from = 1986, to = 1748, by = -2) # defined by BOTTOM year
+# combine fish scale and TOC data over the common era at 10y resolution
+# TOC data from Berger (above) extends back over much of the longer interval of 
+# Baumgartner, although the fish scales are decadal and only continue to 1970
+
+scl <- read.csv('data/Baumgartner-1992_cleaned.csv')
+toc2add2k <- matchTime(dat = toc, tmplt = scl, 
+                       xtrctCol = c('TOC', 'TOCdetrend') )
+ce <- cbind(scl, toc2add2k)
+ce <- ce[ complete.cases(ce), ]
+# write.csv(ce, 'data/composite-datasets-binned-2ky.csv', row.names = FALSE)
+
+# Interpolation/downscaling -----------------------------------------------
+
+# downscale (linear interpolation) decadal data to 2yr resolution of other data
+
+sclTimeTmplt <- data.frame('year' = 2010:1740)
+# need to include the 1740 data to interpolate through to 1750 annually
+sclAnnOrig <- matchTime(dat = scl, tmplt = sclTimeTmplt, 
+                        xtrctCol = c('sardine', 'anchovy'))
+dateChar <- as.Date(ISOdate(sclTimeTmplt$year, 1, 1)) |> as.character()
+sclTs <- timeSeries(sclAnnOrig, charvec = dateChar)
+sclAnnInt <- na.omit(sclTs, method = 'ir', interp = 'linear') |> 
+  as.data.frame()
+sclAnnInt$year <- rownames(sclAnnInt) |> as.Date() |> format('%Y')
+
+scl2add250y <- matchTime(dat = sclAnnInt, tmplt = comp, 
+                         xtrctCol = c('sardine', 'anchovy'))
+comp <- cbind(comp, scl2add250y)
+
+# Biannual time binning ---------------------------------------------------
+
+top <- 1970 # last yr of Baumgartner fish data; 1987 for TOC; 2007 for plankton
+bins <- seq(from = top, to = 1748, by = -2) # defined by BOTTOM year
 binnd <- data.frame()
 for (b in bins){
   bRows <- which(comp$year %in% c(b, b+1))
@@ -120,12 +152,14 @@ for (b in bins){
   copy <- cbind('yearBin' = b, comp[bestRow, ])
   binnd <- rbind(binnd, copy)
 }
+# one manual correction necessary - 
+# fish scales sampled in 1970, everything else in 1971
+# add 1970 fish values to 1970-1971 time bin where NA
+binnd[1, c('sardine', 'anchovy')] <- 
+  comp[comp$year == 1970, c('sardine', 'anchovy')]
 if (is.na(binnd) |> sum() > 0){ stop('check the data for holes') }
 
 # write.csv(binnd, 'data/composite-datasets-binned-250y.csv', row.names = FALSE)
-
-# TODO - option for including additional data sources at different grains:
-# interpolate each series, then bin at desired resolution
 
 # Stationarity tests ------------------------------------------------------
 
@@ -141,24 +175,18 @@ for (col in 3:ncol(binnd)){
     # vAR$coef
 }
 # [1] "ensoi adf test p = 0.01"
-# [1] "ensovar adf test p = 0.46"
-# [1] "TOC adf test p = 0.58"
-# [1] "opal adf test p = 0.34"
+# [1] "ensovar adf test p = 0.5"
+# [1] "TOC adf test p = 0.47"
+# [1] "TOCdetrend adf test p = 0.28"
+# [1] "opal adf test p = 0.38"
 # [1] "dia1 adf test p = 0.01"
 # [1] "dia2 adf test p = 0.01"
 # [1] "sili1 adf test p = 0.01"
 # [1] "DS1 adf test p = 0.01"
 # [1] "DS2 adf test p = 0.01"
+# [1] "sardine adf test p = 0.01"
+# [1] "anchovy adf test p = 0.1"
 
-# 2ky composite df --------------------------------------------------------
+# Detrending --------------------------------------------------------------
 
-# combine fish scale and TOC data over the common era
-# TOC data from Berger (above) extends back over much of the longer interval of 
-# Baumgartner, although the fish scales are decadal and only continue to 1970
-
-scl <- read.csv('data/Baumgartner-1992_cleaned.csv')
-toc2add2k <- matchTime(dat = toc, tmplt = scl, 
-                       xtrctCol = 'TOC') # c('TOC', 'TOCdetrend')
-ce <- cbind(scl, toc2add2k)
-ce <- ce[ complete.cases(ce), ]
-write.csv(ce, 'data/composite-datasets-binned-2ky.csv', row.names = FALSE)
+# TODO
