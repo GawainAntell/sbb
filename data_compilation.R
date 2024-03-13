@@ -2,6 +2,7 @@ library(timeSeries) # library(wql) # linear interpolation within time-series
 library(factoextra) # for PCA extraction
 library(fUnitRoots) # for timeseries stationarity tests
 library(ggplot2)
+library(cowplot)
 library(RColorBrewer)
 source('utils.R') # for custom helper functions
 # csv names of raw data files to concatenate:
@@ -232,25 +233,46 @@ for (v in trendVars){
 
 # Tseries plots -----------------------------------------------------------
 
-# scratch
+plotSeries <- function(vNm, trendVars, decadalVars, dat){
+  v <- dat[, vNm]
+  plotV <- ggplot(dat, aes(x = yearBin, y = v)) +
+    theme_bw() +
+    scale_x_continuous(name = element_blank(),
+                       expand = c(0, 0) # ,limits = c(1748, 1970)
+                       ) +
+    geom_line() +
+    scale_y_continuous(name = vNm)
+  
+  # overplot data points, on original sampling scale
+  if (vNm %in% decadalVars){
+    decades <- dat[ , 'yearBin'] %in% seq(1970, 1750, by = -10)
+    dat10y <- dat[decades, ]
+    v10y <- dat10y[ , vNm]
+    plotV <- plotV +
+      geom_point(data = dat10y, aes(x = yearBin, y = v10y))
+  } else {
+    # for data sampled at biannual resolution or finer
+    plotV <- plotV +
+      geom_point()
+  }
 
-# TODO save basic plot template as object to build upon
-ggplot(binnd, aes(x = yearBin, y = ensovar)) +
-  theme_bw() +
-  geom_line() +
-  geom_smooth(method = lm) # default CI = 95%; specify otherwise with 'level'
+  # overplot trend line if applicable
+  if (vNm %in% trendVars){
+    plotV <- plotV +
+      geom_smooth(method = lm, aes(x = yearBin, y = v)) 
+    # default CI = 95%; specify otherwise with 'level'
+  }
+  plotV
+}
 
+seriesVars <- c('ensovar', 'TOC', 'opal', 'DS1', 'DS2', 'sardine', 'anchovy')
+seriesPlots <- lapply(seriesVars, plotSeries, 
+       trendVars = trendVars, 
+       decadalVars = c('sardine', 'anchovy'),
+       dat = binnd)
 
-compLng <- reshape(binnd, direction = 'long',
-                   v.names = 'value',  varying = trendVars,
-                   timevar = 'variable', times = trendVars,
-                   idvar = 'yearBin', drop = 'year')
-compLng$variable <- factor(compLng$variable, levels = trendVars)
-
-# inspect trends via line charts
-colr6 <- palette.colors(n = 5, 'Set1') # 'Dark2'
-ggplot(compLng, aes(x = yearBin, y = value, group = variable)) +
-  geom_line(aes(color = variable)) + # linetype = variable, 
-#  scale_linetype_manual(values = c('blank', rep('solid', 4), rep('blank', 5), 'solid', 'solid') +
-# 'dashed', 'dotted', 'dotdash', 'longdash', 'twodash
-  scale_color_manual(values = colr6)
+plot_grid(seriesPlots[[1]], seriesPlots[[2]], 
+          seriesPlots[[3]], seriesPlots[[4]], 
+          seriesPlots[[5]], seriesPlots[[6]], 
+          seriesPlots[[7]], ncol = 2,
+          labels = "AUTO", align = 'hv')
