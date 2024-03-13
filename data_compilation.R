@@ -1,6 +1,8 @@
 library(timeSeries) # library(wql) # linear interpolation within time-series
 library(factoextra) # for PCA extraction
 library(fUnitRoots) # for timeseries stationarity tests
+library(ggplot2)
+library(RColorBrewer)
 source('utils.R') # for custom helper functions
 # csv names of raw data files to concatenate:
 allFl <- list.files('data/')
@@ -166,7 +168,7 @@ if (is.na(binnd) |> sum() > 0){ stop('check the data for holes') }
 for (col in 3:ncol(binnd)){
   v <- binnd[, col]
   tst <- adfTest(v) # testing null that there is NON-stationarity
-  p <- round(tst@test$p.value, 2)
+  p <- signif(tst@test$p.value, 2)
   paste(colnames(binnd)[col], 'adf test p =', p) |> print()
   # inspect autocorr at all lags and magnitude of 1st-order autocorr
     # acf(v) 
@@ -187,6 +189,68 @@ for (col in 3:ncol(binnd)){
 # [1] "sardine adf test p = 0.01"
 # [1] "anchovy adf test p = 0.1"
 
+# 250y time series of fish scales, sans interpolated data
+# (confirm that stationarity test values not inflated from pseudoreplicates)
+sard250 <- na.omit(scl2add250y$sardine)
+adfTest(sard250)
+anch250 <- na.omit(scl2add250y$anchovy)
+adfTest(anch250)
+
 # Detrending --------------------------------------------------------------
 
-# TODO
+trendVars <- c('ensovar', 'TOC', 'TOCdetrend', 'opal', 'anchovy')
+# indicated as non-stationary by tests in previous section
+
+# setup data structures to fill in from detrended data
+tblDetrend <- data.frame(matrix(ncol = 6, nrow = length(trendVars)))
+colnames(tblDetrend) <- c('Variable', 'LM intercept', 
+                          'LM coefficient', 'Coefficient SE', 
+                          'ADF test statistic', 'ADF p-val')
+rownames(tblDetrend) <- trendVars
+detrendVars <- paste0(trendVars, 'Detrend')
+binnd[, detrendVars] <- NA
+
+for (v in trendVars){
+  fmla <- formula(paste(v, '~ yearBin'))
+  timeLm <- lm(fmla, data = binnd)
+  # save model coefficients into table for supplemental information
+  timeLmCoef <- summary(timeLm)$coefficients
+  tblDetrend[v, 'LM intercept'] <- timeLmCoef['(Intercept)', 'Estimate'] |>
+    signif(digits = 3)
+  tblDetrend[v, c('LM coefficient', 'Coefficient SE')] <- 
+    timeLmCoef['yearBin', c('Estimate', 'Std. Error')] |> 
+    signif(digits = 2)
+  # also recalculate autocorrelation coefficient
+  tstVals <- adfTest(binnd[, v]) # testing null that there is NON-stationarity
+  p    <- tstVals@test$p.value   |> signif(digits = 2)
+  stat <- tstVals@test$statistic |> signif(digits = 2)
+  tblDetrend[v, c('ADF test statistic', 'ADF p-val')] <- c(stat, p)
+  # add detrended values (residuals) to composite dataframe for future analysis
+  newVarNm <- paste0(v, 'Detrend')
+  binnd[, newVarNm] <- timeLm$residuals
+}
+
+# Tseries plots -----------------------------------------------------------
+
+# scratch
+
+# TODO save basic plot template as object to build upon
+ggplot(binnd, aes(x = yearBin, y = ensovar)) +
+  theme_bw() +
+  geom_line() +
+  geom_smooth(method = lm) # default CI = 95%; specify otherwise with 'level'
+
+
+compLng <- reshape(binnd, direction = 'long',
+                   v.names = 'value',  varying = trendVars,
+                   timevar = 'variable', times = trendVars,
+                   idvar = 'yearBin', drop = 'year')
+compLng$variable <- factor(compLng$variable, levels = trendVars)
+
+# inspect trends via line charts
+colr6 <- palette.colors(n = 5, 'Set1') # 'Dark2'
+ggplot(compLng, aes(x = yearBin, y = value, group = variable)) +
+  geom_line(aes(color = variable)) + # linetype = variable, 
+#  scale_linetype_manual(values = c('blank', rep('solid', 4), rep('blank', 5), 'solid', 'solid') +
+# 'dashed', 'dotted', 'dotdash', 'longdash', 'twodash
+  scale_color_manual(values = colr6)
