@@ -1,6 +1,23 @@
 # This script houses helper functions called in multiple places
 # throughout the data processing and analysis workflow
 
+# Clean a character vector (e.g. column names) containing periods -
+# introduced by conversion when reading Excel special characters into R
+cleanNames <- function(char){
+  # substitute special characters and spaces converted to periods from Excel
+  char <- gsub(x = char, pattern = '\\.\\.', replacement = '_')  
+  char <- gsub(x = char, pattern = '\\.', replacement = '_')  
+  # omit trailing underscore(s) in character strings where present
+  trails <- str_ends(char, '_')
+  char[trails] <- char[trails] |>
+    str_sub(end = -2)
+  # deal with case of double trailing underscores
+  trails2 <- str_ends(char, '_')
+  char[trails2] <- char[trails2] |>
+    str_sub(end = -2) 
+  return(char)
+}
+
 # Match rows in data to rows of target composite df, based on age value:
 # - exclude any missing matches and round non-integer years
 # - return column(s) of target variables with NAs for non-measured study years
@@ -22,6 +39,7 @@ matchTime <- function(dat, tmplt, yrCol = 'year', xtrctCol){
   newCols
 }
 
+# Generate filepath name for charts to save externally
 nameOutput <- function(string, ext = 'pdf'){
   day <- as.Date(date(), format="%a %b %d %H:%M:%S %Y")
   paste0('figs/', string, '_', day, '.', ext)
