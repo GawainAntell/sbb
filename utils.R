@@ -21,3 +21,8 @@ matchTime <- function(dat, tmplt, yrCol = 'year', xtrctCol){
   colnames(newCols) <- xtrctCol
   newCols
 }
+
+nameOutput <- function(string, ext = 'pdf'){
+  day <- as.Date(date(), format="%a %b %d %H:%M:%S %Y")
+  paste0('figs/', string, '_', day, '.', ext)
+}

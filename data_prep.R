@@ -1,8 +1,7 @@
 library(stringr)
 library(tabulizer) # read PDF tables; requires JDK vsn of Java, and rJava pkg
-library(tidyr)
 library(ggplot2)
-library(fUnitRoots) # for timeseries stationarity tests
+source('utils.R') # for custom helper functions
 
 # Vet and format data -----------------------------------------------------
 
@@ -142,20 +141,25 @@ jc19 <- apply(jc19, 2, function(x) replace(x, is.nan(x), NA)) |>
 
 timescale <- 0:2010 # 1748:2010
 plotDat <- data.frame('year' = timescale)
-datNms <- c('enso', 'toc', 'opal', 'diatoms', 'silicos', 'scales', 'otoliths')
-for (dat in list(Li11, Berg04, Barr13o, Barr13d, Barr13s, Baum92, jc19)){
+datNms <- c('enso', 'toc', 'SST, PP', 'opal', 
+            'diatoms', 'silicos', 'scales', 'otoliths')
+for (dat in list(Li11, Berg04, jc19, Barr13o, Barr13d, Barr13s, Baum92, jc19)){
   hasDat <- plotDat[ ,'year'] %in% dat[ ,'year'] |>
     as.numeric()
   plotDat <- cbind(plotDat, hasDat)
 }
 colnames(plotDat)[-1] <- datNms
-plotDatLng <- pivot_longer(plotDat, cols = all_of(datNms), 
-                           names_to = 'dataset',
-                           values_to = 'sampled')
+
+plotDatLng <- reshape(plotDat, direction = 'long',
+                       v.names = 'sampled', varying = datNms,
+                       timevar = 'dataset', times = datNms,
+                       idvar = 'year')
 plotDatLng$dataset <- factor(plotDatLng$dataset, 
-       levels = datNms,
-       ordered = TRUE)
-ggplot(plotDatLng[ plotDatLng$sampled==1, ], 
+                             levels = datNms,
+                             ordered = TRUE)
+
+
+plotPrint <- ggplot(plotDatLng[ plotDatLng$sampled==1, ], 
        aes(x = year, y = dataset)) +
   theme_bw() +
   scale_x_continuous(name = 'year AD', 
@@ -163,3 +167,8 @@ ggplot(plotDatLng[ plotDatLng$sampled==1, ],
                      expand = expansion(add = c(0, 20)),
                      breaks = seq(0, 2000, by = 250)) +
   geom_point(size = 0.3)
+
+plotNm <- nameOutput('tseries-rangethrough-durations', 'pdf')
+pdf(plotNm, width = 6, height = 4)
+print(plotPrint)
+dev.off()
